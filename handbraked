@@ -1,0 +1,35 @@
+#!/usr/bin/env python
+
+import json, time, argparse, sys, glob, os
+
+slept = 0
+sleep_interval = 10
+maxsleep = 60
+
+parser = argparse.ArgumentParser()
+parser.add_argument('-q', '--queue')
+parser.add_argument('-c', '--handbrake-cli')
+parser.add_argument('-p', '--preset')
+args = parser.parse_args()
+
+while slept < maxsleep:
+	qfiles = glob.glob("%s/*.json" % args.queue)
+	qfiles.sort(key=lambda x: os.stat(x).st_mtime)
+	
+	if len(qfiles) > 0:
+		process_file = qfiles[0]
+		print("processing (1 of %i): %s" % (len(qfiles), process_file))
+		with open(process_file) as json_info:
+			cfg = json.load(json_info)
+			out_dir = os.path.dirname(cfg["out"])
+			if not os.path.exists(out_dir):
+				os.makedirs(out_dir)
+			handbrake_cmd = "%s --preset=\"%s\" -i \"%s\" -o \"%s\"" % (args.handbrake_cli, args.preset, cfg["in"], cfg["out"])
+			os.rename(process_file, "%s.processing" % process_file)
+			os.system(handbrake_cmd)
+			os.remove("%s.processing" % process_file)
+			slept = 0
+	else:
+		print("No files in queue... sleeping for %i seconds" % sleep_interval)
+		time.sleep(sleep_interval)
+		slept = slept + sleep_interval
